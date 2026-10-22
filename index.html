@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy-First Local OCR Extractor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Cropper.js CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <!-- Tesseract.js (Local OCR Engine) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+        .cropper-container {
+            max-height: 450px !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200 flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-brand-500/10 text-brand-600 dark:text-brand-500 rounded-xl">
+                    <i data-lucide="scan-text" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">PrivacyOCR</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">100% Local Browser Text Recognition</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- Privacy Badge -->
+                <div class="hidden md:flex items-center space-x-1.5 px-3 py-1 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium border border-green-500/20">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Offline & Private</span>
+                </div>
+
+                <!-- Dark/Light Theme Toggle -->
+                <button id="themeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-600 dark:text-gray-300" title="Toggle Theme">
+                    <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+                    <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+        <!-- Privacy Assurance Banner -->
+        <div class="bg-blue-50 dark:bg-gray-800/60 border border-blue-200 dark:border-gray-700/80 rounded-xl p-4 flex items-start space-x-3">
+            <i data-lucide="lock" class="w-5 h-5 text-brand-600 dark:text-brand-500 mt-0.5 flex-shrink-0"></i>
+            <div class="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                <strong class="text-gray-900 dark:text-white font-semibold">Zero Data Transmission:</strong> All optical character recognition is performed on your device using WebAssembly. Your images, documents, and extracted data never touch any external server.
+            </div>
+        </div>
+
+        <!-- Main Workspace Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+            <!-- LEFT COLUMN: Image Input, Preview & Cropper Tools -->
+            <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700/80 p-5 flex flex-col gap-4">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700/50">
+                    <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i data-lucide="image" class="w-5 h-5 text-brand-500"></i> Source Image
+                    </h2>
+                    
+                    <!-- Language Selection Dropdown -->
+                    <div class="flex items-center gap-2">
+                        <label for="langSelect" class="text-xs text-gray-500 dark:text-gray-400 font-medium hidden sm:inline">Language:</label>
+                        <select id="langSelect" class="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs rounded-lg p-2 focus:ring-2 focus:ring-brand-500 outline-none transition">
+                            <option value="eng" selected>English (ENG)</option>
+                            <option value="fra">French (FRA)</option>
+                            <option value="spa">Spanish (SPA)</option>
+                            <option value="deu">German (DEU)</option>
+                            <option value="chi_sim">Chinese Simplified (CHI)</option>
+                            <option value="jpn">Japanese (JPN)</option>
+                            <option value="ita">Italian (ITA)</option>
+                            <option value="por">Portuguese (POR)</option>
+                            <option value="rus">Russian (RUS)</option>
+                            <option value="ara">Arabic (ARA)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- File Dropzone (Visible when no image selected) -->
+                <div id="dropZone" class="border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-brand-500 dark:hover:border-brand-500 rounded-xl p-8 text-center cursor-pointer transition bg-gray-50/50 dark:bg-gray-900/30 flex flex-col items-center justify-center min-h-[280px]">
+                    <input type="file" id="fileInput" class="hidden" accept="image/png, image/jpeg, image/webp, image/bmp, image/gif">
+                    <div class="p-4 bg-brand-500/10 text-brand-500 rounded-full mb-3">
+                        <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                    </div>
+                    <p class="font-medium text-gray-800 dark:text-gray-200 mb-1">Drag and drop your image here</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Supports PNG, JPG, WEBP, BMP, GIF</p>
+                    <button type="button" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow transition flex items-center gap-2">
+                        <i data-lucide="folder-open" class="w-4 h-4"></i> Browse File
+                    </button>
+                </div>
+
+                <!-- Image Editor Container (Visible after uploading) -->
+                <div id="editorContainer" class="hidden flex flex-col gap-3">
+                    <div class="relative bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex items-center justify-center min-h-[280px] max-h-[420px]">
+                        <img id="imagePreview" class="max-w-full max-h-[420px] object-contain" alt="Selected Document Preview">
+                    </div>
+
+                    <!-- Image Tool Toolbar -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 p-2 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-200 dark:border-gray-700/60 text-xs">
+                        <div class="flex items-center gap-1">
+                            <button id="rotateLeftBtn" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300 transition" title="Rotate Left">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            </button>
+                            <button id="rotateRightBtn" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300 transition" title="Rotate Right">
+                                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                            </button>
+                            <button id="zoomInBtn" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300 transition" title="Zoom In">
+                                <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                            </button>
+                            <button id="zoomOutBtn" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300 transition" title="Zoom Out">
+                                <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                            </button>
+                            <button id="resetCropBtn" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300 transition" title="Reset Crop/Selection">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+
+                        <button id="changeImageBtn" class="text-xs text-red-500 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition flex items-center gap-1">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Change Image
+                        </button>
+                    </div>
+
+                    <!-- Extract Button -->
+                    <button id="extractBtn" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-md transition flex items-center justify-center gap-2 text-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i> Extract Text Now
+                    </button>
+                </div>
+
+                <!-- Progress Indicator Card -->
+                <div id="progressCard" class="hidden flex flex-col gap-2 p-4 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-900/50 rounded-xl">
+                    <div class="flex justify-between items-center text-xs font-medium text-brand-700 dark:text-brand-300">
+                        <span id="statusMessage" class="flex items-center gap-2">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Initializing OCR engine...
+                        </span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-brand-200 dark:bg-brand-900 rounded-full h-2 overflow-hidden">
+                        <div id="progressBar" class="bg-brand-600 h-2 rounded-full transition-all duration-300 w-0"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: OCR Extracted Output & Actions -->
+            <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700/80 p-5 flex flex-col gap-4 h-full">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700/50">
+                    <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i data-lucide="file-text" class="w-5 h-5 text-brand-500"></i> Recognized Text
+                    </h2>
+
+                    <!-- Action Tools (Copy & Download) -->
+                    <div class="flex items-center gap-2">
+                        <button id="copyBtn" disabled class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy
+                        </button>
+                        <button id="downloadBtn" disabled class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i> Save .TXT
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text Filter / Search Bar inside Extracted Text -->
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="searchInput" placeholder="Search within extracted text..." class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg pl-9 pr-3 py-2 text-xs text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-brand-500 outline-none transition" disabled>
+                </div>
+
+                <!-- Extracted Text Display Output -->
+                <div class="relative flex-1 min-h-[260px]">
+                    <textarea id="outputText" readonly placeholder="Extracted text will appear here after scanning..." class="w-full h-full min-h-[260px] p-3.5 bg-gray-50 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-mono focus:ring-2 focus:ring-brand-500 outline-none resize-none transition leading-relaxed"></textarea>
+
+                    <!-- Highlight Match Badge -->
+                    <div id="searchMatchCount" class="hidden absolute right-3 bottom-3 bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium shadow">
+                        0 matches
+                    </div>
+                </div>
+
+                <!-- Text Statistics / Metrics Footer -->
+                <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                    <div class="flex gap-4">
+                        <span>Words: <strong id="wordCount" class="text-gray-800 dark:text-gray-200 font-semibold">0</strong></span>
+                        <span>Characters: <strong id="charCount" class="text-gray-800 dark:text-gray-200 font-semibold">0</strong></span>
+                    </div>
+                    <span id="confidenceScore" class="hidden text-green-600 dark:text-green-400 font-medium">Accuracy: 0%</span>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white dark:bg-white dark:text-gray-900 px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <i data-lucide="check-circle" class="w-4 h-4 text-green-400 dark:text-green-600"></i>
+        <span id="toastMsg">Action completed</span>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // DOM Elements
+        const themeToggle = document.getElementById('themeToggle');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const editorContainer = document.getElementById('editorContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const changeImageBtn = document.getElementById('changeImageBtn');
+        const extractBtn = document.getElementById('extractBtn');
+        const langSelect = document.getElementById('langSelect');
+        const progressCard = document.getElementById('progressCard');
+        const statusMessage = document.getElementById('statusMessage');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressBar = document.getElementById('progressBar');
+        const outputText = document.getElementById('outputText');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const searchInput = document.getElementById('searchInput');
+        const wordCount = document.getElementById('wordCount');
+        const charCount = document.getElementById('charCount');
+        const confidenceScore = document.getElementById('confidenceScore');
+        const searchMatchCount = document.getElementById('searchMatchCount');
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toastMsg');
+
+        // Cropper and Image controls
+        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+        const rotateRightBtn = document.getElementById('rotateRightBtn');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const resetCropBtn = document.getElementById('resetCropBtn');
+
+        let cropper = null;
+        let originalText = '';
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Dark / Light Theme Toggle Functionality
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        });
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Show Toast Notification
+        function showToast(message) {
+            toastMsg.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // File Selection Handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-brand-500', 'bg-brand-50/50');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Load Image and Setup Cropper
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select a valid image file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                dropZone.classList.add('hidden');
+                editorContainer.classList.remove('hidden');
+
+                // Initialize or destroy previous cropper instance
+                if (cropper) {
+                    cropper.destroy();
+                }
+
+                cropper = new Cropper(imagePreview, {
+                    viewMode: 1,
+                    autoCropArea: 0.9,
+                    responsive: true,
+                    background: false,
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Image Manipulation Tools
+        rotateLeftBtn.addEventListener('click', () => cropper && cropper.rotate(-90));
+        rotateRightBtn.addEventListener('click', () => cropper && cropper.rotate(90));
+        zoomInBtn.addEventListener('click', () => cropper && cropper.zoom(0.1));
+        zoomOutBtn.addEventListener('click', () => cropper && cropper.zoom(-0.1));
+        resetCropBtn.addEventListener('click', () => cropper && cropper.reset());
+
+        changeImageBtn.addEventListener('click', () => {
+            if (cropper) cropper.destroy();
+            editorContainer.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            fileInput.value = '';
+            outputText.value = '';
+            updateMetrics('');
+            copyBtn.disabled = true;
+            downloadBtn.disabled = true;
+            searchInput.disabled = true;
+            confidenceScore.classList.add('hidden');
+        });
+
+        // OCR Execution Process using Tesseract.js
+        extractBtn.addEventListener('click', async () => {
+            if (!cropper) return;
+
+            // Get Cropped or Scaled Canvas
+            const canvas = cropper.getCroppedCanvas();
+            if (!canvas) return;
+
+            const selectedLang = langSelect.value;
+            
+            // UI state updates
+            extractBtn.disabled = true;
+            extractBtn.classList.add('opacity-50');
+            progressCard.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+
+            try {
+                // Initialize local Tesseract Worker
+                const worker = await Tesseract.createWorker(selectedLang, 1, {
+                    logger: (m) => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round(m.progress * 100);
+                            progressBar.style.width = `${pct}%`;
+                            progressPercent.textContent = `${pct}%`;
+                            statusMessage.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Recognizing text...`;
+                        } else if (m.status === 'loading tesseract core' || m.status === 'downloading') {
+                            statusMessage.innerHTML = `<i data-lucide="download" class="w-4 h-4 animate-bounce"></i> Loading OCR language model...`;
+                        }
+                        lucide.createIcons();
+                    }
+                });
+
+                // Perform OCR on Image Canvas
+                const ret = await worker.recognize(canvas);
+                const text = ret.data.text;
+                const confidence = Math.round(ret.data.confidence);
+
+                // Set output text
+                originalText = text;
+                outputText.value = text;
+                updateMetrics(text);
+
+                // Show confidence score
+                confidenceScore.textContent = `Accuracy: ${confidence}%`;
+                confidenceScore.classList.remove('hidden');
+
+                // Enable text control buttons
+                copyBtn.disabled = false;
+                downloadBtn.disabled = false;
+                searchInput.disabled = false;
+
+                showToast('Text extracted successfully!');
+                await worker.terminate();
+
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to extract text. Please try again.');
+            } finally {
+                extractBtn.disabled = false;
+                extractBtn.classList.remove('opacity-50');
+                progressCard.classList.add('hidden');
+            }
+        });
+
+        // Text Metrics Calculator
+        function updateMetrics(text) {
+            const trimmed = text.trim();
+            const words = trimmed ? trimmed.split(/\s+/).length : 0;
+            const chars = text.length;
+
+            wordCount.textContent = words.toLocaleString();
+            charCount.textContent = chars.toLocaleString();
+        }
+
+        // Copy Text to Clipboard
+        copyBtn.addEventListener('click', () => {
+            if (!outputText.value) return;
+            outputText.select();
+            document.execCommand('copy');
+            showToast('Copied to clipboard!');
+        });
+
+        // Download Text File
+        downloadBtn.addEventListener('click', () => {
+            if (!outputText.value) return;
+            const blob = new Blob([outputText.value], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `OCR-Extraction-${new Date().toISOString().slice(0,10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Downloaded text file!');
+        });
+
+        // Search within extracted text
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            if (!term) {
+                outputText.value = originalText;
+                searchMatchCount.classList.add('hidden');
+                return;
+            }
+
+            const matches = (originalText.toLowerCase().match(new RegExp(term, 'g')) || []).length;
+            searchMatchCount.textContent = `${matches} match${matches === 1 ? '' : 'es'}`;
+            searchMatchCount.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
