@@ -1,18 +1,11 @@
 {
   "name": "Local Image Text Extractor",
   "short_name": "OCR Extractor",
-  "description": "Extract text from images 100% locally in your browser.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "theme_color": "#0f172a",
   "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/1541/1541434.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/1541/1541434.png",
       "sizes": "512x512",
