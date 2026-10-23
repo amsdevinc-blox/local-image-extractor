@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.local_image_extractor.twa",
+        "sha256_cert_fingerprints": ["0E:E3:D3:35:E7:9A:8D:BE:4B:C5:B7:9F:03:07:6A:95:44:F3:64:E9:6F:CE:41:36:C7:0F:95:C6:A6:F9:F8:14"]
+      }
+    }]
